@@ -29,7 +29,10 @@
         </activity>
 
         <activity android:name=".activity.LoadCmdListActivity" />
-
+        <service
+            android:name=".comn.UsbService"
+            android:enabled="true">
+        </service>
     </application>
 
 </manifest>

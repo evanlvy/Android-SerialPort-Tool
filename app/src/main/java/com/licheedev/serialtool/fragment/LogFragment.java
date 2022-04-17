@@ -63,10 +63,10 @@ public class LogFragment extends Fragment {
     public void updateAutoEndButton() {
         if (getView() != null) {
             if (LogManager.instance().isAutoEnd()) {
-                mBtnAutoEnd.setText("禁止自动显示最新日志");
+                mBtnAutoEnd.setText(R.string.stop_scroll);
                 mLvLogs.setSelection(mAdapter.getCount() - 1);
             } else {
-                mBtnAutoEnd.setText("自动显示最新日志");
+                mBtnAutoEnd.setText(R.string.auto_scroll);
             }
         }
     }

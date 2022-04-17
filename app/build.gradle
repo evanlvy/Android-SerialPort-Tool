@@ -29,7 +29,7 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    androidTestCompile('androidx.test.espresso:espresso-core:3.1.0', {
+    androidTestImplementation('androidx.test.espresso:espresso-core:3.1.0', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
 
@@ -58,5 +58,7 @@ dependencies {
     // 硬件操作工具类
     implementation 'com.licheedev:hardwareutils:1.0.0'
     implementation 'com.licheedev:logplus:1.0.0'
-    
+
+    // USB serial
+    implementation 'com.github.felHR85:UsbSerial:6.1.0'
 }

@@ -13,7 +13,7 @@ public class SendMessage implements IMessage {
 
     public SendMessage(String command) {
         this.command = command;
-        this.message = TimeUtil.currentTime() + "    发送命令：" + command;
+        this.message = TimeUtil.currentTime() + "    Command: " + command;
     }
 
     @Override

@@ -42,7 +42,7 @@ public class CommandParser {
                     comment = "";
                 }
 
-                if (cmd.matches("[0-9a-fA-F]+")) {
+                if (true/*cmd.matches("[0-9a-fA-F]+")*/) {
                     Command command = new Command(cmd, comment);
                     commands.add(command);
                 }

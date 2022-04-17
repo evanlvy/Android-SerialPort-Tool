@@ -2,11 +2,6 @@
 <resources>
 
     <string-array name="baudrates">
-        <item>110</item>
-        <item>300</item>
-        <item>600</item>
-        <item>1200</item>
-        <item>2400</item>
         <item>4800</item>
         <item>9600</item>
         <item>14400</item>
@@ -16,6 +11,7 @@
         <item>57600</item>
         <item>115200</item>
         <item>128000</item>
+        <item>230400</item>
         <item>256000</item>
     </string-array>
 

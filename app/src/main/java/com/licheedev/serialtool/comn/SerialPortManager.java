@@ -4,6 +4,7 @@ import android.os.HandlerThread;
 import android.serialport.SerialPort;
 import com.licheedev.hwutils.ByteUtil;
 import com.licheedev.myutils.LogPlus;
+import com.licheedev.serialtool.activity.MainActivity;
 import com.licheedev.serialtool.comn.message.LogManager;
 import com.licheedev.serialtool.comn.message.SendMessage;
 import io.reactivex.Observable;
@@ -14,8 +15,16 @@ import io.reactivex.Scheduler;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Created by Administrator on 2017/3/28 0028.
@@ -28,6 +37,7 @@ public class SerialPortManager {
     private OutputStream mOutputStream;
     private HandlerThread mWriteThread;
     private Scheduler mSendScheduler;
+    private volatile boolean mReadLock = false;
 
     private static class InstanceHolder {
 
@@ -53,6 +63,11 @@ public class SerialPortManager {
         return open(device.getPath(), device.getBaudrate());
     }
 
+    public boolean open(String path) {
+        open(path, "115200");
+        return true;
+    }
+
     /**
      * 打开串口
      *
@@ -67,13 +82,17 @@ public class SerialPortManager {
 
         try {
             File device = new File(devicePath);
-            int baurate = Integer.parseInt(baudrateString);
-            mSerialPort = new SerialPort(device, baurate);
-
-            mReadThread = new SerialReadThread(mSerialPort.getInputStream());
+            InputStream is = null;
+            if (MainActivity.DebugMode) {
+                is = new FileInputStream(device);
+            } else {
+                is = mSerialPort.getInputStream();
+                mOutputStream = mSerialPort.getOutputStream();
+                int baudRate = Integer.parseInt(baudrateString);
+                mSerialPort = new SerialPort(device, baudRate);
+            }
+            mReadThread = new SerialReadThread(is, data -> mReadLock = false);
             mReadThread.start();
-
-            mOutputStream = mSerialPort.getOutputStream();
 
             mWriteThread = new HandlerThread("write-thread");
             mWriteThread.start();
@@ -119,7 +138,9 @@ public class SerialPortManager {
      * @return
      */
     private void sendData(byte[] datas) throws Exception {
-        mOutputStream.write(datas);
+        if (mOutputStream != null) {
+            mOutputStream.write(datas);
+        }
     }
 
     /**
@@ -138,7 +159,7 @@ public class SerialPortManager {
                     emitter.onNext(new Object());
                 } catch (Exception e) {
 
-                    LogPlus.e("发送：" + ByteUtil.bytes2HexStr(datas) + " 失败", e);
+                    LogPlus.e("发送：" + (MainActivity.mHexMode?ByteUtil.bytes2HexStr(datas):new String(datas, StandardCharsets.US_ASCII)) + " 失败", e);
 
                     if (!emitter.isDisposed()) {
                         emitter.onError(e);
@@ -153,12 +174,17 @@ public class SerialPortManager {
     /**
      * 发送命令包
      */
-    public void sendCommand(final String command) {
+    public void sendCommand(final String command, boolean isHex) {
 
         // TODO: 2018/3/22  
-        LogPlus.i("发送命令：" + command);
+        //LogPlus.i("发送命令：" + command);
 
-        byte[] bytes = ByteUtil.hexStr2bytes(command);
+        byte[] bytes = new byte[0];
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            bytes = isHex? ByteUtil.hexStr2bytes(command):(command+'\r').getBytes(StandardCharsets.US_ASCII);
+        } else {
+            bytes = isHex? ByteUtil.hexStr2bytes(command):(command+'\r').getBytes();
+        }
         rxSendData(bytes).subscribeOn(mSendScheduler).subscribe(new Observer<Object>() {
             @Override
             public void onSubscribe(Disposable d) {
@@ -180,5 +206,25 @@ public class SerialPortManager {
 
             }
         });
+        if (MainActivity.DebugMode) {
+            mReadThread.triggerDbgRsp();
+        }
+    }
+
+    public synchronized void sendCommandSync(String command, boolean isHex, boolean isSync) {
+        sendCommand(command, isHex);
+        if (!isSync) return;
+        int timeout = 1000;
+        mReadLock = true;
+        try {
+            while(timeout > 0 && mReadLock) {
+                timeout--;
+                Thread.sleep(5);
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return;
+        }
+
     }
 }

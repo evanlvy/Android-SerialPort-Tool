@@ -34,8 +34,19 @@
             android:layout_weight="1"
             android:background="@color/colorLightBlue"
             android:textSize="@dimen/default_text_size"
-            tools:entries="@array/baudrates" />
+            tools:entries="@array/baudrates"
+            android:visibility="gone"/>
 
+
+        <Spinner
+            android:id="@+id/spinner_usb"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/normal_8dp"
+            android:layout_weight="1"
+            android:background="@color/colorLightBlue"
+            android:textSize="@dimen/default_text_size"
+            tools:entries="@array/baudrates" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -55,12 +66,32 @@
             android:textSize="@dimen/default_text_size"
             tools:entries="@array/baudrates" />
 
+        <Switch
+            android:id="@+id/sw_usb"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:text="@string/use_usb_port"
+            android:layout_marginLeft="@dimen/horizontal_margin"
+            android:textColor="@color/white"
+            android:textSize="@dimen/default_text_size"
+            android:checked="true" />
+
         <Button
             android:id="@+id/btn_open_device"
-            android:layout_width="@dimen/normal_240dp"
+            android:layout_width="@dimen/normal_290dp"
             android:layout_height="@dimen/default_button_height"
-            android:layout_marginLeft="@dimen/horizontal_margin"
             android:text="@string/open_serial_port"
+            android:textSize="@dimen/default_text_size" />
+
+        <Switch
+            android:id="@+id/sw_hex"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginLeft="@dimen/horizontal_margin"
+            android:text="@string/load_hex_cmd"
+            android:textColor="@color/white"
             android:textSize="@dimen/default_text_size" />
 
 
@@ -84,11 +115,11 @@
                 android:id="@+id/et_data"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/default_button_height"
-                android:digits="0123456789abcdefABCDEF"
                 android:hint="@string/input_data"
                 android:inputType="textCapCharacters"
                 android:singleLine="true"
                 android:textSize="@dimen/edit_text_size" />
+            <!--android:digits="0123456789abcdefABCDEF"-->
 
             <Button
                 android:id="@+id/btn_send_data"

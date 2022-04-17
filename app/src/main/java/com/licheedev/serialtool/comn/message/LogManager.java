@@ -1,5 +1,7 @@
 package com.licheedev.serialtool.comn.message;
 
+import com.licheedev.serialtool.util.Logf;
+
 import java.util.ArrayList;
 import java.util.List;
 import org.greenrobot.eventbus.EventBus;
@@ -28,6 +30,7 @@ public class LogManager {
 
     public void add(IMessage message) {
         messages.add(message);
+        Logf.i("", message.getMessage());
     }
 
     public void post(IMessage message) {

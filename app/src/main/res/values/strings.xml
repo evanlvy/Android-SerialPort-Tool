@@ -1,12 +1,31 @@
 <resources>
-    <string name="app_name">串口调试助手</string>
-    <string name="select_serial_port">串口设备:</string>
-    <string name="select_baud_rate">波特率</string>
-    <string name="open_serial_port">打开串口</string>
-    <string name="close_serial_port">关闭串口</string>
-    <string name="no_serial_device">找不到串口设备</string>
-    <string name="send_data">发送命令</string>
-    <string name="input_data">输入命令</string>
-    <string name="load_cmd_list">加载命令列表</string>
-  
+    <string name="app_name">SmartCable TransTest</string>
+    <string name="select_serial_port">Port:</string>
+    <string name="select_baud_rate">BaudRate:</string>
+    <string name="open_serial_port">Open Port</string>
+    <string name="close_serial_port">Close Port</string>
+    <string name="no_serial_device">No serial device found</string>
+    <string name="send_data">Send Command</string>
+    <string name="input_data">Input Command</string>
+    <string name="load_cmd_list">Load Command List</string>
+    <string name="send_by_list">Send All Commands</string>
+    <string name="stop_send">Stop</string>
+    <string name="send_in_loop">Loop</string>
+    <string name="on">ON</string>
+    <string name="off">OFF</string>
+    <string name="load_hex_cmd">HEX Mode</string>
+
+    <string name="stop_scroll">Stop AutoScroll</string>
+    <string name="auto_scroll">Start AutoScroll</string>
+    <string name="log_clear">Clear Log</string>
+    <string name="invalid_data">Invalid data</string>
+    <string name="toast_start_debug_mode">Start under debug mode</string>
+    <string name="open_port_ok">Open Port Successfully</string>
+    <string name="open_port_fail">Open port Failed!</string>
+    <string name="parse_fail">Parse failed</string>
+    <string name="file_not_selected">No file selected</string>
+    <string name="no_name">No Name</string>
+
+    <string name="use_usb_port">USBSerial</string>
+    <string name="waiting_usb">Waiting USB...</string>
 </resources>

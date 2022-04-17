@@ -1,0 +1,31 @@
+<resources>
+    <string name="app_name">SmartCable调试助手</string>
+    <string name="select_serial_port">端口:</string>
+    <string name="select_baud_rate">波特率:</string>
+    <string name="open_serial_port">打开串口</string>
+    <string name="close_serial_port">关闭串口</string>
+    <string name="no_serial_device">找不到串口设备</string>
+    <string name="send_data">发送命令</string>
+    <string name="input_data">输入命令</string>
+    <string name="load_cmd_list">加载命令列表</string>
+    <string name="send_by_list">依次发送所有命令</string>
+    <string name="stop_send">停止发送</string>
+    <string name="send_in_loop">循环</string>
+    <string name="on">开</string>
+    <string name="off">关</string>
+    <string name="load_hex_cmd">HEX模式</string>
+
+    <string name="stop_scroll">停止自动滚动</string>
+    <string name="auto_scroll">自动滚动</string>
+    <string name="log_clear">清除日志</string>
+    <string name="invalid_data">无效数据</string>
+    <string name="toast_start_debug_mode">开始调试模式</string>
+    <string name="open_port_ok">成功打开串口</string>
+    <string name="open_port_fail">打开串口失败</string>
+    <string name="parse_fail">解析失败</string>
+    <string name="file_not_selected">未选择文件</string>
+    <string name="no_name">未命名</string>
+
+    <string name="use_usb_port">USB串口</string>
+    <string name="waiting_usb">等待USB...</string>
+</resources>
