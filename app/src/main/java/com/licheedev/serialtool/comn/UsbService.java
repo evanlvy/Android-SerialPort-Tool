@@ -14,7 +14,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
-import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
@@ -25,6 +24,7 @@ import com.felhr.usbserial.UsbSerialDevice;
 import com.felhr.usbserial.UsbSerialInterface;
 import com.licheedev.myutils.LogPlus;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -51,6 +51,12 @@ public class UsbService extends Service implements SerialPortCallback {
     private static final int BAUD_RATE = 230400; // BaudRate. Change this value if you need
     public static boolean SERVICE_CONNECTED = false;
 
+    public static final int ERR_NO_USB_SERIAL_AVAILABLE = 1;
+    public static final int ERR_CANNOT_OPEN_DEVICE = 2;
+    public static final int ERR_DEVICE_DISCONNECTED = 3;
+    public static final int ERR_USB_DEVICE_NOT_SERIAL = 4;
+
+
     private List<UsbSerialDevice> serialPorts;
 
     private Context context;
@@ -67,20 +73,69 @@ public class UsbService extends Service implements SerialPortCallback {
     private Handler mHandler;
     private int baudRate = 230400;
 
-    public interface OnUsbSerialAttachedListener {
-        void onAttached(int index, String portName);
+    /*public interface ParamRunnable extends Runnable {
+        public ParamRunnable setCallback(OnUsbSerialEventListener callback);
+    }*/
+    public interface OnUsbSerialEventListener {
+        void onAttached(ArrayList<String> ports);
+        void onError(int errno, String Name);
     }
-    private OnUsbSerialAttachedListener onUsbSerialAttachedListener;
-    public void setOnUsbSerialAttachedListener(OnUsbSerialAttachedListener onUsbSerialAttachedListener) {
-        this.onUsbSerialAttachedListener = onUsbSerialAttachedListener;
-        // DEBUG ONLY
-        /* if (onUsbSerialAttachedListener != null) {
-            onUsbSerialAttachedListener.onAttached(0, "Port1-1004-001-004");
-            onUsbSerialAttachedListener.onAttached(1, "Port2-1004-001-004");
+    private OnUsbSerialEventListener onUsbSerialEventListener;
+    public void setOnUsbSerialEventListener(OnUsbSerialEventListener onUsbSerialEventListener) {
+        this.onUsbSerialEventListener = onUsbSerialEventListener;
+        if(serialPorts == null || serialPorts.size() <= 0){
+            if (onUsbSerialEventListener != null) {
+                onUsbSerialEventListener.onError(ERR_NO_USB_SERIAL_AVAILABLE, "No Usb serial ports available");
+            }
+        } else {
+            notifySerialPortDetected(serialPorts);
+        }
+        /*
+        if (MainActivity.DebugMode) {
+            ParamRunnable debugRunnable = new ParamRunnable() {
+                OnUsbSerialEventListener callback;
+
+                @Override
+                public ParamRunnable setCallback(OnUsbSerialEventListener callback) {
+                    this.callback = callback;
+                    return this;
+                }
+
+                @Override
+                public void run() {
+                    while(builder != null) {
+                        LogPlus.e("Debug thread running.");
+                        try {
+                            Thread.sleep(5000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        // DEBUG ONLY
+                        if (callback != null) {
+                            // Fake insert USB
+                            ArrayList<String> ports = new ArrayList<>();
+                            ports.add("Port1-1004-001-004");
+                            ports.add("Port2-1004-001-004");
+                            callback.onAttached(ports);
+                        }
+
+                        try {
+                            Thread.sleep(15000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        if (callback != null) {
+                            // Fake remove USB
+                            Intent intent = new Intent(ACTION_USB_DISCONNECTED);
+                            sendBroadcast(intent);
+                            //onUsbSerialEventListener.onError(ERR_NO_USB_SERIAL_AVAILABLE, "No Usb serial ports available");
+                        }
+                    }
+                }
+            };
+            debugRunnable = debugRunnable.setCallback(onUsbSerialEventListener);
+            new Thread(debugRunnable).start();
         }*/
-        if(serialPorts == null || serialPorts.size() <= 0)
-            return;
-        onSerialPortsDetected(serialPorts);
     }
     /*
      * Different notifications from OS will be received here (USB attached, detached, permission responses...)
@@ -89,58 +144,83 @@ public class UsbService extends Service implements SerialPortCallback {
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context arg0, Intent arg1) {
+            String msg = null;
+            int errorId = -1;
             if (arg1.getAction().equals(ACTION_USB_ATTACHED)) {
                 boolean ret = builder.openSerialPorts(context, baudRate,
                         UsbSerialInterface.DATA_BITS_8,
                         UsbSerialInterface.STOP_BITS_1,
                         UsbSerialInterface.PARITY_NONE,
                         UsbSerialInterface.FLOW_CONTROL_OFF);
-               if(!ret)
-                   Toast.makeText(context, "Couldnt open the device", Toast.LENGTH_SHORT).show();
+               if(!ret) {
+                   msg = "Couldnt open the device";
+                   errorId = ERR_CANNOT_OPEN_DEVICE;
+                   //Toast.makeText(context, "Couldnt open the device", Toast.LENGTH_SHORT).show();
+               }
             } else if (arg1.getAction().equals(ACTION_USB_DETACHED)) {
 
                 UsbDevice usbDevice = arg1.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 boolean ret = builder.disconnectDevice(usbDevice);
 
-                if(ret)
-                    Toast.makeText(context, "Usb device disconnected", Toast.LENGTH_SHORT).show();
-                else
-                    Toast.makeText(context, "Usb device wasnt a serial port", Toast.LENGTH_SHORT).show();
-
+                if(ret) {
+                    msg = "Usb device disconnected";
+                    errorId = ERR_DEVICE_DISCONNECTED;
+                    //Toast.makeText(context, "Usb device disconnected", Toast.LENGTH_SHORT).show();
+                }
+                else {
+                    msg ="Usb device wasnt a serial port";
+                    errorId = ERR_USB_DEVICE_NOT_SERIAL;
+                    //Toast.makeText(context, "Usb device wasnt a serial port", Toast.LENGTH_SHORT).show();
+                }
                 Intent intent = new Intent(ACTION_USB_DISCONNECTED);
                 arg0.sendBroadcast(intent);
-
+            }
+            if (errorId > 0 && onUsbSerialEventListener != null) {
+                onUsbSerialEventListener.onError(ERR_CANNOT_OPEN_DEVICE, msg);
             }
         }
     };
 
+    private void notifySerialPortDetected(List<UsbSerialDevice> serialPorts) {
+        if(serialPorts == null || serialPorts.size() == 0 || onUsbSerialEventListener == null) {
+            LogPlus.e("notifySerialPortDetected: NO SERIAL PORT! or invalid callback!");
+            return;
+        }
+        ArrayList<String> ports = new ArrayList<>();
+        for (int index=0; index < serialPorts.size(); index++){
+            UsbSerialDevice serialDevice = serialPorts.get(index);
+            ports.add(serialDevice.getPortName()+"-"
+                    +serialDevice.getDeviceId()+"-"+serialDevice.getPid()+"-"+serialDevice.getVid());
+            onUsbSerialEventListener.onAttached(ports);
+        }
+    }
+
     @Override
     public void onSerialPortsDetected(List<UsbSerialDevice> serialPorts) {
         this.serialPorts = serialPorts;
-        LogPlus.e("onSerialPortsDetected");
-        if(serialPorts.size() == 0)
+        if(serialPorts == null || serialPorts.size() == 0) {
+            LogPlus.e("onSerialPortsDetected: NO SERIAL PORT!");
             return;
-
+        }
+        LogPlus.d("onSerialPortsDetected");
         if (writeThread == null) {
             writeThread = new WriteThread();
             writeThread.start();
         }
 
         int index = 0;
-
         if (readThreadCOM1 == null && index <= serialPorts.size()-1
                 && serialPorts.get(index).isOpen()) {
             readThreadCOM1 = new ReadThreadCOM(index,
                     serialPorts.get(index).getInputStream());
             readThreadCOM1.start();
-            UsbSerialDevice serialDevice = serialPorts.get(index);
-            if (onUsbSerialAttachedListener != null) {
-                onUsbSerialAttachedListener.onAttached(index, ""+serialDevice.getPortName()+"-"
-                        +serialDevice.getDeviceId()+"-"+serialDevice.getPid()+"-"+serialDevice.getVid());
-            }
-            Toast.makeText(context, "USB Serial COnnected: "+serialDevice.getDeviceId()+"-"+
-                            serialDevice.getPid()+"-"+serialDevice.getVid()+"-"+serialDevice.getPortName()
-                    , Toast.LENGTH_SHORT).show();
+            /*UsbSerialDevice serialDevice = serialPorts.get(index);
+            try {
+                Toast.makeText(context, "USB Serial COnnected: " + serialDevice.getDeviceId() + "-" +
+                                serialDevice.getPid() + "-" + serialDevice.getVid() + "-" + serialDevice.getPortName()
+                        , Toast.LENGTH_SHORT).show();
+            }catch (Exception e) {
+            }*/
         }
 
         index++;
@@ -149,20 +229,20 @@ public class UsbService extends Service implements SerialPortCallback {
             readThreadCOM2 = new ReadThreadCOM(index,
                     serialPorts.get(index).getInputStream());
             readThreadCOM2.start();
-            UsbSerialDevice serialDevice2 = serialPorts.get(index);
-            if (onUsbSerialAttachedListener != null) {
-                onUsbSerialAttachedListener.onAttached(index, ""+serialDevice2.getPortName()+"-"
-                        +serialDevice2.getDeviceId()+"-"+serialDevice2.getPid()+"-"+serialDevice2.getVid());
-            }
-            Toast.makeText(context, "USB Serial COnnected: "+serialDevice2.getDeviceId()+"-"+
-                            serialDevice2.getPid()+"-"+serialDevice2.getVid()+"-"+serialDevice2.getPortName()
-                    , Toast.LENGTH_SHORT).show();
-
+            /*UsbSerialDevice serialDevice2 = serialPorts.get(index);
+            try {
+                Toast.makeText(context, "USB Serial COnnected: "+serialDevice2.getDeviceId()+"-"+
+                                serialDevice2.getPid()+"-"+serialDevice2.getVid()+"-"+serialDevice2.getPortName()
+                        , Toast.LENGTH_SHORT).show();
+            }catch (Exception e) {
+            }*/
         }
+        notifySerialPortDetected(serialPorts);
     }
 
     @Override
     public void onCreate() {
+        LogPlus.e("onCreate");
         this.context = this;
         UsbService.SERVICE_CONNECTED = true;
         setFilter();
@@ -175,8 +255,12 @@ public class UsbService extends Service implements SerialPortCallback {
                 UsbSerialInterface.PARITY_NONE,
                 UsbSerialInterface.FLOW_CONTROL_OFF);
 
-        if(!ret)
-            Toast.makeText(context, "No Usb serial ports available", Toast.LENGTH_SHORT).show();
+        if(!ret) {
+            //Toast.makeText(context, "No Usb serial ports available", Toast.LENGTH_SHORT).show();
+            if (onUsbSerialEventListener != null) {
+                onUsbSerialEventListener.onError(ERR_NO_USB_SERIAL_AVAILABLE, "No Usb serial ports available");
+            }
+        }
     }
 
     @Nullable

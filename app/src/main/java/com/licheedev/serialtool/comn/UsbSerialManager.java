@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
-import android.util.ArraySet;
 import android.widget.Toast;
 
 import com.licheedev.hwutils.ByteUtil;
@@ -21,6 +20,7 @@ import com.licheedev.serialtool.comn.message.RecvMessage;
 import com.licheedev.serialtool.comn.message.SendMessage;
 import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Set;
 
 /**
@@ -34,7 +34,7 @@ public class UsbSerialManager {
     public volatile int mPortIndex = 0;
     private MainActivity mActivity;
     private String mBaudRate = "230400";
-    private ArraySet<String> mPorts = new ArraySet<>();
+    private ArrayList<String> mPorts = new ArrayList<>();
 
     private static class InstanceHolder {
 
@@ -49,7 +49,7 @@ public class UsbSerialManager {
     }
 
     public interface OnUsbSerialAttachedListener {
-        void onAttached(String[] ports);
+        void onAttached(ArrayList<String> ports);
     }
     private OnUsbSerialAttachedListener onUsbSerialAttachedListener;
     public void setOnUsbSerialAttachedListener(OnUsbSerialAttachedListener onUsbSerialAttachedListener) {
@@ -99,7 +99,7 @@ public class UsbSerialManager {
      * 发送命令包
      */
     public void sendCommand(final String command, boolean isHex) {
-        //LogPlus.i("发送命令：" + command);
+        LogPlus.i("Sending cmd: " + command);
         byte[] bytes = new byte[0];
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             bytes = isHex? ByteUtil.hexStr2bytes(command):(command+'\r').getBytes(StandardCharsets.US_ASCII);
@@ -108,10 +108,10 @@ public class UsbSerialManager {
         }
         try {
             usbService.write(bytes, mPortIndex);
-            LogManager.instance().post(new SendMessage(command));
+            LogManager.instance().post(new SendMessage(mPortIndex+"->"+command));
         } catch (Exception e) {
             Toast.makeText(mActivity, e.getMessage(), Toast.LENGTH_SHORT).show();
-            LogPlus.e("发送：" + command + " 失败", e);
+            LogPlus.e("Sending: " + command + " FAILED!", e);
         }
         if (MainActivity.DebugMode) {
             //mReadThread.triggerDbgRsp();
@@ -128,6 +128,10 @@ public class UsbSerialManager {
                 timeout--;
                 Thread.sleep(5);
             }
+            if (mReadLock) {
+                // Timeout!
+                LogManager.instance().post(new RecvMessage("TIMEOUT!"));
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
             return;
@@ -140,22 +144,29 @@ public class UsbSerialManager {
     private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            String msg = null;
             switch (intent.getAction()) {
                 case UsbService.ACTION_USB_PERMISSION_GRANTED: // USB PERMISSION GRANTED
-                    Toast.makeText(context, "USB Ready", Toast.LENGTH_SHORT).show();
+                    msg = "USB Ready";
                     break;
                 case UsbService.ACTION_USB_PERMISSION_NOT_GRANTED: // USB PERMISSION NOT GRANTED
-                    Toast.makeText(context, "USB Permission not granted", Toast.LENGTH_SHORT).show();
+                    msg = "USB Permission not granted";
                     break;
                 case UsbService.ACTION_NO_USB: // NO USB CONNECTED
-                    Toast.makeText(context, "No USB connected", Toast.LENGTH_SHORT).show();
+                    msg = "No USB connected";
                     break;
                 case UsbService.ACTION_USB_DISCONNECTED: // USB DISCONNECTED
-                    Toast.makeText(context, "USB disconnected", Toast.LENGTH_SHORT).show();
+                    if (onUsbSerialAttachedListener != null) {
+                        onUsbSerialAttachedListener.onAttached(new ArrayList<String>());
+                    }
+                    msg = "USB disconnected";
                     break;
                 case UsbService.ACTION_USB_NOT_SUPPORTED: // USB NOT SUPPORTED
-                    Toast.makeText(context, "USB device not supported", Toast.LENGTH_SHORT).show();
+                    msg = "USB device not supported";
                     break;
+            }
+            if (msg != null) {
+                Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show();
             }
         }
     };
@@ -199,6 +210,7 @@ public class UsbSerialManager {
 
     public void onResume() {
         setFilters();  // Start listening notifications from UsbService
+        LogPlus.d("startService");
         Bundle bundle = new Bundle();
         bundle.putString("BAUDRATE", mBaudRate);
         startService(UsbService.class, usbConnection, bundle); // Start UsbService(if it was not started before) and Bind it
@@ -206,6 +218,7 @@ public class UsbSerialManager {
 
     public void onPause() {
         mActivity.unregisterReceiver(mUsbReceiver);
+        LogPlus.d("unbindService");
         mActivity.unbindService(usbConnection);
     }
 
@@ -222,21 +235,37 @@ public class UsbSerialManager {
             mActivity.startService(startService);
         }
         Intent bindingIntent = new Intent(mActivity, service);
+        LogPlus.d("bindService");
         mActivity.bindService(bindingIntent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
     private final ServiceConnection usbConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName arg0, IBinder arg1) {
+            LogPlus.d("onServiceConnected");
             usbService = ((UsbService.UsbBinder) arg1).getService();
             usbService.setHandler(mHandler);
-            usbService.setOnUsbSerialAttachedListener(new UsbService.OnUsbSerialAttachedListener() {
+            usbService.setOnUsbSerialEventListener(new UsbService.OnUsbSerialEventListener() {
                 @Override
-                public void onAttached(int index, String portName) {
-                    mPorts.add(""+index+"@USB "+portName);
-                    if (onUsbSerialAttachedListener != null) {
-                        onUsbSerialAttachedListener.onAttached(mPorts.toArray(new String[mPorts.size()]));
+                public void onAttached(ArrayList<String> ports) {
+                    if (ports == null) {
+                        mPorts = new ArrayList<String>();
+                    } else {
+                        mPorts = ports;
                     }
+                    if (onUsbSerialAttachedListener != null) {
+                        onUsbSerialAttachedListener.onAttached(mPorts);
+                    }
+                }
+
+                @Override
+                public void onError(int errno, String msg) {
+                    mActivity.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show();
+                        }
+                    });
                 }
             });
         }

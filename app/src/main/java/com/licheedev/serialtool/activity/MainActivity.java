@@ -31,6 +31,8 @@ import com.licheedev.serialtool.util.constant.PreferenceKeys;
 
 import static com.licheedev.serialtool.R.array.baudrates;
 
+import java.util.ArrayList;
+
 
 public class MainActivity extends BaseActivity implements AdapterView.OnItemSelectedListener {
 
@@ -61,7 +63,7 @@ public class MainActivity extends BaseActivity implements AdapterView.OnItemSele
 
     private String[] mDevices;
     private String[] mBaudrates;
-    private String[] mUsbPorts;
+    private ArrayList<String> mUsbPorts = new ArrayList<>();
 
     private boolean mOpened = false;
     public static boolean mHexMode = false;
@@ -136,7 +138,8 @@ public class MainActivity extends BaseActivity implements AdapterView.OnItemSele
             };
         }
 
-        mUsbPorts = new String[] {getString(R.string.waiting_usb)};
+        //mUsbPorts = new String[] {getString(R.string.waiting_usb)};
+        mUsbPorts.add(getString(R.string.waiting_usb));
 
         // 波特率
         mBaudrates = getResources().getStringArray(baudrates);
@@ -215,10 +218,6 @@ public class MainActivity extends BaseActivity implements AdapterView.OnItemSele
             SerialPortManager.instance().close();
             UsbSerialManager.instance().close();
             mOpened = false;
-        } else if (DebugMode) {
-            String path = getExternalFilesDir(null)+"/test_dev.txt";
-            mOpened = SerialPortManager.instance().open(path);
-            ToastUtil.showOne(this, R.string.toast_start_debug_mode);
         } else {
             // 保存配置
             PrefHelper.getDefault().saveInt(PreferenceKeys.SERIAL_PORT_DEVICES, mSerialDeviceIndex);
@@ -227,31 +226,37 @@ public class MainActivity extends BaseActivity implements AdapterView.OnItemSele
                 mOpened = UsbSerialManager.instance().open(MainActivity.this, "", mBaudrates[mBaudrateIndex]);
                 UsbSerialManager.instance().setOnUsbSerialAttachedListener(new UsbSerialManager.OnUsbSerialAttachedListener() {
                     @Override
-                    public void onAttached(String[] ports) {
-                        mUsbPorts = ports;
-                        ArrayAdapter<String> usbAdapter =
-                                new ArrayAdapter<String>(MainActivity.this, R.layout.spinner_default_item, mUsbPorts);
-                        mSpinnerUsbs.setAdapter(usbAdapter);
-                        int port_idx = -1, selector_idx = 0;
-                        for (int i=0; i<mUsbPorts.length; i++) {
-                            int port =  Integer.parseInt(""+mUsbPorts[i].charAt(0));
-                            if (port > port_idx) {
-                                port_idx = port;
-                                selector_idx = i;
+                    public void onAttached(ArrayList<String> ports) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (ports == null || ports.size() <= 0) {
+                                    mUsbPorts.clear();
+                                    mUsbPorts.add(getString(R.string.waiting_usb));
+                                } else {
+                                    mUsbPorts = ports;
+                                }
+                                ArrayAdapter<String> usbAdapter =
+                                        new ArrayAdapter<String>(MainActivity.this, R.layout.spinner_default_item, mUsbPorts);
+                                mSpinnerUsbs.setAdapter(usbAdapter);
+                                mUsbSerialIndex = (mUsbPorts == null)?0:mUsbPorts.size()-1;
+                                mSpinnerUsbs.setSelection(mUsbSerialIndex);  // Use the second port by default
+                                UsbSerialManager.instance().setPort(mUsbSerialIndex);
                             }
-                        }
-                        mSpinnerUsbs.setSelection(selector_idx);  // Use the second port by default
-                        mUsbSerialIndex = port_idx;
-                        UsbSerialManager.instance().setPort(mUsbSerialIndex);
+                        });
                     }
                 });
             } else {
-                mOpened = SerialPortManager.instance().open(mDevice) != null;
+                if (DebugMode) {
+                    String path = getExternalFilesDir(null)+"/test_dev.txt";
+                    mOpened = SerialPortManager.instance().open(path);
+                    ToastUtil.showOne(this, R.string.toast_start_debug_mode);
+                } else {
+                    mOpened = SerialPortManager.instance().open(mDevice) != null;
+                }
             }
-            if (mOpened) {
-                ToastUtil.showOne(this, R.string.open_port_ok);
-            } else {
-                ToastUtil.showOne(this, R.string.open_port_fail);
+            if (!mUsbMode) {
+                ToastUtil.showOne(this, mOpened ? R.string.open_port_ok : R.string.open_port_fail);
             }
         }
         updateViewState(mOpened);
@@ -299,11 +304,10 @@ public class MainActivity extends BaseActivity implements AdapterView.OnItemSele
                 mDevice.setBaudrate(mBaudrates[mBaudrateIndex]);
                 break;
             case R.id.spinner_usb:
-                String selected = mUsbPorts[position];
+                String selected = mUsbPorts.get(position);
                 try {
-                    int port_idx = Integer.parseInt(""+selected.charAt(0));
-                    if (port_idx >= 0 && port_idx <= (mUsbPorts.length - 1)) {
-                        mUsbSerialIndex = port_idx;
+                    if (position >= 0 && position <= (mUsbPorts.size() - 1)) {
+                        mUsbSerialIndex = position;
                         UsbSerialManager.instance().setPort(mUsbSerialIndex);
                     }
                 } catch (Exception e){}
