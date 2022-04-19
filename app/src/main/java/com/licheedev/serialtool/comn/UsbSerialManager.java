@@ -22,6 +22,8 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Administrator on 2017/3/28 0028.
@@ -30,7 +32,7 @@ public class UsbSerialManager {
 
     private static final String TAG = "UsbSerialManager";
 
-    public volatile boolean mReadLock = false;
+    public Semaphore mRspLock;
     public volatile int mPortIndex = 0;
     private MainActivity mActivity;
     private String mBaudRate = "230400";
@@ -77,6 +79,7 @@ public class UsbSerialManager {
         mActivity = activity;
         mBaudRate = baudrateString;
         mHandler = new MyHandler(mActivity);
+        mRspLock = new Semaphore(-1);
         onResume();
         return true;
     }
@@ -121,20 +124,16 @@ public class UsbSerialManager {
     public synchronized void sendCommandSync(String command, boolean isHex, boolean isSync) {
         sendCommand(command, isHex);
         if (!isSync) return;
-        int timeout = 1000;
-        mReadLock = true;
         try {
-            while(timeout > 0 && mReadLock) {
-                timeout--;
-                Thread.sleep(5);
-            }
-            if (mReadLock) {
+            boolean isRspOk = mRspLock.tryAcquire(5, TimeUnit.SECONDS);
+            if (!isRspOk) {
                 // Timeout!
                 LogManager.instance().post(new RecvMessage("TIMEOUT!"));
+                //mRspLock.release();
+                LogPlus.e("Command Timeout!");
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
-            return;
         }
     }
 
@@ -189,9 +188,9 @@ public class UsbSerialManager {
                     String buffer = (String) msg.obj;
                     int port = msg.arg1;
                     if (UsbSerialManager.instance().mPortIndex == port) {
-                        //LogPlus.e("ReadThread: call onReceive");
-                        UsbSerialManager.instance().mReadLock = false;
+                        UsbSerialManager.instance().mRspLock.release();
                         LogManager.instance().post(new RecvMessage(buffer));
+                        LogPlus.i("Response: " + buffer);
                     }
                     break;
             }

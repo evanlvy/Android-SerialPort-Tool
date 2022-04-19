@@ -103,33 +103,39 @@ public class UsbService extends Service implements SerialPortCallback {
 
                 @Override
                 public void run() {
+                    LogPlus.e("Debug thread running.");
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    // DEBUG ONLY
+                    if (callback != null) {
+                        // Fake insert USB
+                        ArrayList<String> ports = new ArrayList<>();
+                        ports.add("Port1-1004-001-004");
+                        ports.add("Port2-1004-001-004");
+                        callback.onAttached(ports);
+                    }
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     while(builder != null) {
-                        LogPlus.e("Debug thread running.");
+                        mHandler.obtainMessage(SYNC_READ, 1, 0, "OK").sendToTarget();
                         try {
-                            Thread.sleep(5000);
+                            Thread.sleep(20);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
-                        // DEBUG ONLY
-                        if (callback != null) {
-                            // Fake insert USB
-                            ArrayList<String> ports = new ArrayList<>();
-                            ports.add("Port1-1004-001-004");
-                            ports.add("Port2-1004-001-004");
-                            callback.onAttached(ports);
-                        }
+                    }
 
-                        try {
-                            Thread.sleep(15000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        if (callback != null) {
-                            // Fake remove USB
-                            Intent intent = new Intent(ACTION_USB_DISCONNECTED);
-                            sendBroadcast(intent);
-                            //onUsbSerialEventListener.onError(ERR_NO_USB_SERIAL_AVAILABLE, "No Usb serial ports available");
-                        }
+                    if (callback != null) {
+                        // Fake remove USB
+                        Intent intent = new Intent(ACTION_USB_DISCONNECTED);
+                        sendBroadcast(intent);
+                        //onUsbSerialEventListener.onError(ERR_NO_USB_SERIAL_AVAILABLE, "No Usb serial ports available");
                     }
                 }
             };
